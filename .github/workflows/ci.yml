@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install project
+        run: uv sync --all-extras --dev
+      
+      - name: Run lint check
+        run: uv run ruff check .
+
+      - name: Run black check
+        run: uv run black --check .
+
+      - name: Run deptry check
+        run: uv run deptry .
+
+      - name: Run mypy check
+        run: uv run mypy .
+
+      - name: Run pytest
+        run: uv run pytest
+
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docker:
+              - 'Dockerfile'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'src/**'
+              - '.github/workflows/ci.yml'
+
+  docker-build-test:
+    needs: [lint-check, changes]
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && needs.changes.outputs.docker == 'true')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t locust-async-chat:test .
+
+      - name: Verify container starts
+        run: |
+          docker run --rm -d --name test-container -p 8089:8089 locust-async-chat:test
+          sleep 10
+          docker logs test-container 2>&1 | grep -q "Starting Locust"
+          docker stop test-container
