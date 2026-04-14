@@ -23,7 +23,7 @@ For a deeper dive into the design decisions, architecture, and extensibility of 
               | questions                 | questions
               +------------+--------------+
                            v
-+----------+    login    +--------------+    message    +---------+
++----------+    login   +--------------+    message    +---------+
 |  User    |----------->|   Locust     |-------------->|   SUT   |
 |  Pool    |  user info |   User       |   + question  |         |
 +----------+            +--------------+               +----+----+
